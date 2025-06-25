@@ -2,16 +2,10 @@ pipeline {
     agent any
 
     tools {
-        maven 'Maven_3.9.9' // This is the Maven tool name in Jenkins
+        maven 'Maven_3.9.9'
     }
 
     stages {
-        stage('Checkout') {
-            steps {
-                git 'https://github.com/spring-petclinic/spring-petclinic-rest.git'
-            }
-        }
-
         stage('Build with Maven') {
             steps {
                 sh 'mvn clean install'
@@ -20,27 +14,22 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    dockerImage = docker.build("kimaya/petclinic")
-                }
+                sh 'docker build -t kimaya/petclinic .'
             }
         }
 
         stage('Push to DockerHub') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
-                    script {
-                        docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-creds') {
-                            dockerImage.push("latest")
-                        }
-                    }
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
+                    sh 'echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin'
+                    sh 'docker push kimaya/petclinic'
                 }
             }
         }
 
         stage('Deploy with Ansible') {
             steps {
-                sh 'ansible-playbook -i ansible/inventory ansible/deploy.yml'
+                sh 'ansible-playbook deploy.yml'
             }
         }
     }
